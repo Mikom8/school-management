@@ -1,0 +1,1348 @@
+import React, { useState, useEffect } from "react";
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  Eye,
+  Users,
+  X,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Folder,
+  FileText,
+  Save,
+} from "lucide-react";
+import axios from "axios";
+import { useAuth } from "../../contexts/AuthContext";
+
+const StudentManagement = () => {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterGrade, setFilterGrade] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showGradeReport, setShowGradeReport] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [gradeReportData, setGradeReportData] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const { user } = useAuth();
+
+  // Notification state
+  const [notification, setNotification] = useState({
+    show: false,
+    type: "", // 'success', 'error', 'warning', 'info'
+    title: "",
+    message: "",
+  });
+
+  // Add Student Form State
+  const [newStudent, setNewStudent] = useState({
+    name: "",
+    email: "",
+    password: "",
+    grade: "",
+    dateOfBirth: "",
+    parentName: "",
+    parentContact: "",
+    emergencyContact: "",
+    course: "",
+    department: "",
+    address: {
+      street: "",
+      city: "",
+      state: "",
+      zipCode: "",
+    },
+  });
+
+  // Edit Student Form State
+  const [editStudent, setEditStudent] = useState({
+    name: "",
+    grade: "",
+    dateOfBirth: "",
+    parentName: "",
+    parentContact: "",
+    emergencyContact: "",
+    course: "",
+    department: "",
+    address: {
+      street: "",
+      city: "",
+      state: "",
+      zipCode: "",
+    },
+  });
+
+  useEffect(() => {
+    fetchStudents();
+    fetchAvailableCourses();
+  }, []);
+
+  // Auto-hide notification after 5 seconds
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification((prev) => ({ ...prev, show: false }));
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification.show]);
+
+  const showNotification = (type, title, message) => {
+    setNotification({
+      show: true,
+      type,
+      title,
+      message,
+    });
+  };
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get("/students");
+      setStudents(response.data.data || []);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+      setStudents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchStudentGrades = async (studentId) => {
+    try {
+      const response = await axios.get(`/grades?studentId=${studentId}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching student grades:", error);
+      return [];
+    }
+  };
+
+  const filteredStudents = students.filter((student) => {
+    const matchesSearch =
+      student.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.studentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.course?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.department?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGrade = !filterGrade || student.grade === filterGrade;
+    return matchesSearch && matchesGrade;
+  });
+
+  // fetch courses
+  const fetchAvailableCourses = async () => {
+    try {
+      setCoursesLoading(true);
+      const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      const response = await axios.get("/courses", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      // API returns { success, data, pagination } — extract the array
+      const allCourses = response.data?.data || response.data || [];
+
+      // Keep only unique course names for the dropdown
+      const seen = new Set();
+      const uniqueCourses = (Array.isArray(allCourses) ? allCourses : []).filter(
+        (course) => {
+          const key = course.name.trim().toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }
+      );
+
+      setCourses(uniqueCourses);
+    } catch (error) {
+      console.error("Error fetching courses for dropdown:", error);
+      setCourses([]);
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
+
+  const handleDeleteStudent = async (studentId) => {
+    if (!window.confirm("Are you sure you want to delete this student?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`/students/${studentId}`);
+      fetchStudents(); // Refresh the list
+      showNotification("success", "Success", "Student deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      showNotification("error", "Error", "Failed to delete student");
+    }
+  };
+
+  const handleEditStudent = (student) => {
+    setSelectedStudent(student);
+    setEditStudent({
+      name: student.user?.name || "",
+      grade: student.grade || "",
+      dateOfBirth: student.dateOfBirth
+        ? new Date(student.dateOfBirth).toISOString().split("T")[0]
+        : "",
+      parentName: student.parentName || "",
+      parentContact: student.parentContact || "",
+      emergencyContact: student.emergencyContact || "",
+      course: student.course || "",
+      department: student.department || "",
+      address: {
+        street: student.address?.street || "",
+        city: student.address?.city || "",
+        state: student.address?.state || "",
+        zipCode: student.address?.zipCode || "",
+      },
+    });
+    setShowEditForm(true);
+  };
+
+  const handleUpdateStudent = async (e) => {
+    e.preventDefault();
+
+    if (!selectedStudent) return;
+
+    try {
+      const updateData = {
+        name: editStudent.name,
+        grade: editStudent.grade,
+        dateOfBirth: editStudent.dateOfBirth,
+        parentName: editStudent.parentName,
+        parentContact: editStudent.parentContact,
+        emergencyContact: editStudent.emergencyContact,
+        course: editStudent.course,
+        department: editStudent.department,
+        address: editStudent.address,
+      };
+
+      await axios.put(`/students/${selectedStudent._id}`, updateData);
+
+      setShowEditForm(false);
+      setSelectedStudent(null);
+      fetchStudents(); // Refresh the list
+      showNotification("success", "Success", "Student updated successfully!");
+    } catch (error) {
+      console.error("Error updating student:", error);
+      showNotification("error", "Error", "Failed to update student");
+    }
+  };
+
+  const handleViewGradeReport = async (student) => {
+    try {
+      setSelectedStudent(student);
+      setLoading(true);
+
+      // Fetch student grades
+      const grades = await fetchStudentGrades(student.studentId);
+
+      setGradeReportData({
+        student: student,
+        grades: grades,
+        gpa: calculateGPA(grades),
+      });
+
+      setShowGradeReport(true);
+    } catch (error) {
+      console.error("Error fetching grade report:", error);
+      showNotification("error", "Error", "Failed to load grade report");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateGPA = (grades) => {
+    const gradePoints = {
+      A: 4.0,
+      "A-": 3.7,
+      "B+": 3.3,
+      B: 3.0,
+      "B-": 2.7,
+      "C+": 2.3,
+      C: 2.0,
+      "C-": 1.7,
+      "D+": 1.3,
+      D: 1.0,
+      F: 0.0,
+    };
+
+    let totalPoints = 0;
+    let totalCredits = 0;
+
+    grades.forEach((grade) => {
+      const credits = grade.course?.credits || 0;
+      const points = gradePoints[grade.grade] || 0;
+      totalPoints += points * credits;
+      totalCredits += credits;
+    });
+
+    return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : "0.00";
+  };
+
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+
+    // Frontend validation
+    if (
+      !newStudent.name ||
+      !newStudent.email ||
+      !newStudent.password ||
+      !newStudent.grade ||
+      !newStudent.parentName ||
+      !newStudent.parentContact
+    ) {
+      showNotification(
+        "warning",
+        "Validation Error",
+        "Please fill all required fields (marked with *)"
+      );
+      return;
+    }
+
+    if (newStudent.password.length < 6) {
+      showNotification(
+        "warning",
+        "Validation Error",
+        "Password must be at least 6 characters long"
+      );
+      return;
+    }
+
+    try {
+      // Format the data properly for the backend
+      const studentData = {
+        name: newStudent.name,
+        email: newStudent.email,
+        password: newStudent.password,
+        grade: newStudent.grade,
+        dateOfBirth:
+          newStudent.dateOfBirth || new Date().toISOString().split("T")[0],
+        parentName: newStudent.parentName,
+        parentContact: newStudent.parentContact,
+        emergencyContact:
+          newStudent.emergencyContact || newStudent.parentContact,
+        course: newStudent.course,
+        department: newStudent.department,
+        address: newStudent.address,
+      };
+
+      const response = await axios.post("/students/register", studentData);
+
+      if (response.data.success) {
+        setShowAddForm(false);
+        setNewStudent({
+          name: "",
+          email: "",
+          password: "",
+          grade: "",
+          dateOfBirth: "",
+          parentName: "",
+          parentContact: "",
+          emergencyContact: "",
+          course: "",
+          department: "",
+          address: {
+            street: "",
+            city: "",
+            state: "",
+            zipCode: "",
+          },
+        });
+        fetchStudents(); // Refresh the list
+        showNotification("success", "Success", "Student added successfully!");
+      }
+    } catch (error) {
+      // Show the specific validation error
+      if (
+        error.response?.data?.errors &&
+        error.response.data.errors.length > 0
+      ) {
+        const validationError = error.response.data.errors[0];
+        showNotification(
+          "error",
+          "Validation Error",
+          `${validationError.msg} (field: ${validationError.param})`
+        );
+      } else {
+        const errorMessage =
+          error.response?.data?.message || "Failed to add student";
+        showNotification("error", "Error", errorMessage);
+      }
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name.startsWith("address.")) {
+      const addressField = name.split(".")[1];
+      setNewStudent((prev) => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          [addressField]: value,
+        },
+      }));
+    } else {
+      setNewStudent((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    if (name.startsWith("address.")) {
+      const addressField = name.split(".")[1];
+      setEditStudent((prev) => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          [addressField]: value,
+        },
+      }));
+    } else {
+      setEditStudent((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+
+  // College grade options
+  const gradeOptions = [
+    "Remedial",
+    "1st Year Degree",
+    "2nd Year Degree",
+    "3rd Year Degree",
+    "4th Year Degree",
+    "5th Year Degree",
+    "1st-3rd Year Diploma",
+  ];
+
+  // Notification icon and colors
+  const getNotificationStyles = (type) => {
+    const styles = {
+      success: {
+        bg: "bg-green-50 dark:bg-green-900",
+        border: "border-green-200 dark:border-green-800",
+        icon: (
+          <CheckCircle
+            className="text-green-600 dark:text-green-400"
+            size={24}
+          />
+        ),
+        text: "text-green-800 dark:text-green-300",
+      },
+      error: {
+        bg: "bg-red-50 dark:bg-red-900",
+        border: "border-red-200 dark:border-red-800",
+        icon: (
+          <AlertCircle className="text-red-600 dark:text-red-400" size={24} />
+        ),
+        text: "text-red-800 dark:text-red-300",
+      },
+      warning: {
+        bg: "bg-yellow-50 dark:bg-yellow-900",
+        border: "border-yellow-200 dark:border-yellow-800",
+        icon: (
+          <AlertCircle
+            className="text-yellow-600 dark:text-yellow-400"
+            size={24}
+          />
+        ),
+        text: "text-yellow-800 dark:text-yellow-300",
+      },
+      info: {
+        bg: "bg-blue-50 dark:bg-blue-900",
+        border: "border-blue-200 dark:border-blue-800",
+        icon: <Info className="text-blue-600 dark:text-blue-400" size={24} />,
+        text: "text-blue-800 dark:text-blue-300",
+      },
+    };
+    return styles[type] || styles.info;
+  };
+
+  const getGradeColor = (grade) => {
+    switch (grade) {
+      case "A":
+      case "A-":
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300";
+      case "B+":
+      case "B":
+      case "B-":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300";
+      case "C+":
+      case "C":
+      case "C-":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300";
+      case "D+":
+      case "D":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300";
+      case "F":
+        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300";
+    }
+  };
+
+  if (loading && !showGradeReport) {
+    return (
+      <div className="space-y-6 p-4 md:p-6 lg:p-8">
+        <div className="flex justify-between items-center flex-wrap">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+              Student Management
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Loading students...
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 font-saira">
+      {/* Notification Popup */}
+      {notification.show && (
+        <div
+          className={`fixed top-4 right-4 z-50 max-w-sm w-full animate-in slide-in-from-right-full duration-500`}
+        >
+          <div
+            className={`${getNotificationStyles(notification.type).bg} ${
+              getNotificationStyles(notification.type).border
+            } rounded-lg border p-4 shadow-lg`}
+          >
+            <div className="flex items-start space-x-3">
+              {getNotificationStyles(notification.type).icon}
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`font-medium ${
+                    getNotificationStyles(notification.type).text
+                  }`}
+                >
+                  {notification.title}
+                </p>
+                <p
+                  className={`mt-1 text-sm ${
+                    getNotificationStyles(notification.type).text
+                  } opacity-90`}
+                >
+                  {notification.message}
+                </p>
+              </div>
+              <button
+                onClick={() =>
+                  setNotification((prev) => ({ ...prev, show: false }))
+                }
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Grade Report Modal */}
+      {showGradeReport && gradeReportData && (
+        <div className="fixed top-0 right-0 w-[100%] h-screen bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 border dark:border-gray-400 border-blue-500 rounded-lg max-w-4xl w-full max-h-[92vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Grade Report - {gradeReportData.student.user?.name}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowGradeReport(false);
+                    setGradeReportData(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Student Info Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                      Student ID
+                    </p>
+                    <p className="text-lg font-bold text-blue-800 dark:text-blue-200">
+                      {gradeReportData.student.studentId}
+                    </p>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      Academic Year
+                    </p>
+                    <p className="text-lg font-bold text-green-800 dark:text-green-200">
+                      {gradeReportData.student.grade}
+                    </p>
+                  </div>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                    <p className="text-sm text-purple-600 dark:text-purple-400">
+                      Cumulative GPA
+                    </p>
+                    <p className="text-lg font-bold text-purple-800 dark:text-purple-200">
+                      {gradeReportData.gpa}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Grades Table */}
+                {gradeReportData.grades.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-600">
+                          <th className="text-left py-3 px-4 font-medium">
+                            Course
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium">
+                            Grade
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium">
+                            Credits
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium">
+                            Semester
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium">
+                            Instructor
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gradeReportData.grades.map((grade, index) => (
+                          <tr
+                            key={index}
+                            className="border-b border-gray-100 dark:border-gray-700"
+                          >
+                            <td className="py-3 px-4">
+                              <div className="font-medium">
+                                {grade.course?.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {grade.course?.code}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getGradeColor(
+                                  grade.grade
+                                )}`}
+                              >
+                                {grade.grade}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              {grade.course?.credits || 0}
+                            </td>
+                            <td className="py-3 px-4 text-sm">
+                              {grade.semester}
+                            </td>
+                            <td className="py-3 px-4 text-sm">
+                              {grade.teacher?.name || "N/A"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <FileText size={48} className="mx-auto mb-4 opacity-50" />
+                    <p>No grades available for this student</p>
+                    <p className="text-sm mt-2">
+                      Grades will appear here once submitted by instructors
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <button
+                  onClick={() => {
+                    setShowGradeReport(false);
+                    setGradeReportData(null);
+                  }}
+                  className="btn btn-secondary cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {showEditForm && selectedStudent && (
+        <div className="fixed top-0 right-0 w-[100%] h-screen bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 border dark:border-gray-400 border-blue-500 rounded-lg max-w-4xl w-full max-h-[92vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Edit Student - {selectedStudent.user?.name}
+                </h2>
+                <button
+                  onClick={() => setShowEditForm(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateStudent} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      value={editStudent.name}
+                      onChange={handleEditInputChange}
+                      className="input"
+                      placeholder="Enter student's full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Academic Year *
+                    </label>
+                    <select
+                      name="grade"
+                      required
+                      value={editStudent.grade}
+                      onChange={handleEditInputChange}
+                      className="input"
+                    >
+                      <option value="">Select Academic Year</option>
+                      {gradeOptions.map((grade) => (
+                        <option key={grade} value={grade}>
+                          {grade}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Date of Birth *
+                    </label>
+                    <input
+                      type="date"
+                      name="dateOfBirth"
+                      required
+                      value={editStudent.dateOfBirth}
+                      onChange={handleEditInputChange}
+                      className="input"
+                    />
+                  </div>
+                  {/* In your Edit Student form */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Course/Program *
+                    </label>
+                    <select
+                      name="course"
+                      required
+                      value={editStudent.course}
+                      onChange={handleEditInputChange}
+                      className="input"
+                      disabled={coursesLoading}
+                    >
+                      <option value="">Select a course</option>
+                      {coursesLoading ? (
+                        <option value="" disabled>
+                          Loading courses...
+                        </option>
+                      ) : (
+                        courses.map((course) => (
+                          <option key={course._id} value={course.name}>
+                            {course.name} {/* Shows only main course name */}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Department
+                    </label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={editStudent.department}
+                      onChange={handleEditInputChange}
+                      className="input"
+                      placeholder="e.g., Computer Science"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Parent/Guardian Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="parentName"
+                      required
+                      value={editStudent.parentName}
+                      onChange={handleEditInputChange}
+                      className="input"
+                      placeholder="Enter parent/guardian name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Parent Contact *
+                    </label>
+                    <input
+                      type="text"
+                      name="parentContact"
+                      required
+                      value={editStudent.parentContact}
+                      onChange={handleEditInputChange}
+                      className="input"
+                      placeholder="Enter parent/guardian phone number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Emergency Contact *
+                    </label>
+                    <input
+                      type="text"
+                      name="emergencyContact"
+                      required
+                      value={editStudent.emergencyContact}
+                      onChange={handleEditInputChange}
+                      className="input"
+                      placeholder="Enter emergency contact number"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-500 pt-2">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
+                    Address Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Street
+                      </label>
+                      <input
+                        type="text"
+                        name="address.street"
+                        value={editStudent.address.street}
+                        onChange={handleEditInputChange}
+                        className="input"
+                        placeholder="Enter street address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        name="address.city"
+                        value={editStudent.address.city}
+                        onChange={handleEditInputChange}
+                        className="input"
+                        placeholder="Enter city"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        name="address.state"
+                        value={editStudent.address.state}
+                        onChange={handleEditInputChange}
+                        className="input"
+                        placeholder="Enter state"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ZIP Code
+                      </label>
+                      <input
+                        type="text"
+                        name="address.zipCode"
+                        value={editStudent.address.zipCode}
+                        onChange={handleEditInputChange}
+                        className="input"
+                        placeholder="Enter ZIP code"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditForm(false)}
+                    className="btn btn-secondary cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary cursor-pointer flex items-center space-x-2"
+                  >
+                    <span>Update Student</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest of your component remains the same */}
+      <div className="flex justify-between items-start sm:items-center flex-col sm:flex-row gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            Student Management
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
+            Manage college student records and information
+          </p>
+        </div>
+        {user?.role === "admin" && (
+          <button
+            className="btn btn-primary flex items-center space-x-2 w-full sm:w-auto justify-center sm:justify-start cursor-pointer"
+            onClick={() => setShowAddForm(true)}
+          >
+            <Plus size={20} />
+            <span>Add Student</span>
+          </button>
+        )}
+      </div>
+
+      {/* Add Student Form Modal */}
+      {showAddForm && (
+        <div className="fixed top-0 right-0 w-[100%] h-screen bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 border dark:border-gray-400 border-blue-500 rounded-lg max-w-4xl w-full max-h-[92vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Add New College Student
+                </h2>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleAddStudent} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      value={newStudent.name}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="Enter student's full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      required
+                      value={newStudent.email}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="Enter student's college email"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Password *
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      required
+                      value={newStudent.password}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="Enter temporary password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Academic Year *
+                    </label>
+                    <select
+                      name="grade"
+                      required
+                      value={newStudent.grade}
+                      onChange={handleInputChange}
+                      className="input"
+                    >
+                      <option value="">Select Academic Year</option>
+                      {gradeOptions.map((grade) => (
+                        <option key={grade} value={grade}>
+                          {grade}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Date of Birth *
+                    </label>
+                    <input
+                      type="date"
+                      name="dateOfBirth"
+                      required
+                      value={newStudent.dateOfBirth}
+                      onChange={handleInputChange}
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Course/Program *
+                    </label>
+                    <select
+                      name="course"
+                      required
+                      value={newStudent.course}
+                      onChange={handleInputChange}
+                      className="input"
+                      disabled={coursesLoading}
+                    >
+                      <option value="">Select a course</option>
+                      {coursesLoading ? (
+                        <option value="" disabled>
+                          Loading courses...
+                        </option>
+                      ) : (
+                        courses.map((course) => (
+                          <option key={course._id} value={course.name}>
+                            {course.name}{" "}
+                            {/* Now shows only: "Computer Science" */}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    {courses.length === 0 && !coursesLoading && (
+                      <p className="text-xs text-yellow-600 mt-1">
+                        No courses available. Please create courses first in
+                        Course Management.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Department
+                    </label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={newStudent.department}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="e.g., Computer Science"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Parent/Guardian Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="parentName"
+                      required
+                      value={newStudent.parentName}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="Enter parent/guardian name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Parent Contact *
+                    </label>
+                    <input
+                      type="text"
+                      name="parentContact"
+                      required
+                      value={newStudent.parentContact}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="Enter parent/guardian phone number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Emergency Contact *
+                    </label>
+                    <input
+                      type="text"
+                      name="emergencyContact"
+                      required
+                      value={newStudent.emergencyContact}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="Enter emergency contact number"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-500 pt-2">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
+                    Address Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Street
+                      </label>
+                      <input
+                        type="text"
+                        name="address.street"
+                        value={newStudent.address.street}
+                        onChange={handleInputChange}
+                        className="input"
+                        placeholder="Enter street address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        name="address.city"
+                        value={newStudent.address.city}
+                        onChange={handleInputChange}
+                        className="input"
+                        placeholder="Enter city"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        name="address.state"
+                        value={newStudent.address.state}
+                        onChange={handleInputChange}
+                        className="input"
+                        placeholder="Enter state"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ZIP Code
+                      </label>
+                      <input
+                        type="text"
+                        name="address.zipCode"
+                        value={newStudent.address.zipCode}
+                        onChange={handleInputChange}
+                        className="input"
+                        placeholder="Enter ZIP code"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="btn btn-secondary cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary cursor-pointer"
+                  >
+                    Add Student
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest of your component remains the same */}
+      {/* Filters and Search */}
+      <div className="card">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="input relative w-full">
+            <Search
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={20}
+            />
+            <input
+              type="text"
+              placeholder="Search students by name, ID, course, or department..."
+              className="inpt pl-10 w-full placeholder:text-gray-400 outline-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <select
+            className="input w-full md:w-auto"
+            value={filterGrade}
+            onChange={(e) => setFilterGrade(e.target.value)}
+          >
+            <option value="">All Academic Years</option>
+            {gradeOptions.map((grade) => (
+              <option key={grade} value={grade}>
+                {grade}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Students Table */}
+      <div className="card">
+        {filteredStudents.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <Users size={48} className="mx-auto mb-4 opacity-50" />
+            <p>No students found</p>
+            <p className="text-sm mt-2">
+              {students.length === 0
+                ? "No students in the system yet"
+                : "No students match your search criteria"}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-600">
+                  <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base whitespace-nowrap">
+                    Student ID
+                  </th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base">
+                    Name
+                  </th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base hidden md:table-cell">
+                    Email
+                  </th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base whitespace-nowrap hidden sm:table-cell">
+                    Academic Year
+                  </th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base hidden lg:table-cell">
+                    Course
+                  </th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base hidden lg:table-cell">
+                    Department
+                  </th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base whitespace-nowrap">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.map((student) => (
+                  <tr
+                    key={student._id}
+                    className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs sm:text-sm"
+                  >
+                    <td className="py-3 px-2 sm:px-4 font-mono text-gray-900 dark:text-white">
+                      {student.studentId}
+                    </td>
+                    <td className="py-3 px-2 sm:px-4">
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {student.user?.name}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 sm:px-4 text-gray-900 dark:text-white hidden md:table-cell">
+                      {student.user?.email}
+                    </td>
+                    <td className="py-3 px-2 sm:px-4 text-gray-900 dark:text-white hidden sm:table-cell whitespace-nowrap">
+                      {student.grade}
+                    </td>
+                    <td className="py-3 px-2 sm:px-4 text-gray-900 dark:text-white hidden lg:table-cell">
+                      {student.course || "-"}
+                    </td>
+                    <td className="py-3 px-2 sm:px-4 text-gray-900 dark:text-white hidden lg:table-cell">
+                      {student.department || "-"}
+                    </td>
+                    <td className="py-3 px-2 sm:px-4">
+                      <div className="flex space-x-1 sm:space-x-2">
+                        <button
+                          className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer"
+                          title="Grade report"
+                          onClick={() => handleViewGradeReport(student)}
+                        >
+                          <Folder size={16} className="sm:size-4" />
+                        </button>
+                        {user?.role === "admin" && (
+                          <>
+                            <button
+                              className="p-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 cursor-pointer"
+                              title="Edit Info"
+                              onClick={() => handleEditStudent(student)}
+                            >
+                              <Edit size={16} className="sm:size-4" />
+                            </button>
+                            <button
+                              className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
+                              title="Delete"
+                              onClick={() => handleDeleteStudent(student._id)}
+                            >
+                              <Trash2 size={16} className="sm:size-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default StudentManagement;

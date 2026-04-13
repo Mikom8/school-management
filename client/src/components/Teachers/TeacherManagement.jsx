@@ -1,0 +1,1283 @@
+import React, { useState, useEffect } from "react";
+import {
+  Plus,
+  Search,
+  Mail,
+  Edit,
+  Trash2,
+  UserCog,
+  Save,
+  X,
+  BookOpen,
+  Check,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+import axios from "axios";
+import { useAuth } from "../../contexts/AuthContext";
+
+// Custom Popup Component
+const CustomPopup = ({
+  type,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  show,
+  children,
+}) => {
+  if (!show) return null;
+
+  const getIcon = () => {
+    switch (type) {
+      case "success":
+        return <CheckCircle className="w-6 h-6 text-green-500" />;
+      case "error":
+        return <AlertCircle className="w-6 h-6 text-red-500" />;
+      case "warning":
+        return <AlertCircle className="w-6 h-6 text-yellow-500" />;
+      case "info":
+        return <Info className="w-6 h-6 text-blue-500" />;
+      default:
+        return <Info className="w-6 h-6 text-blue-500" />;
+    }
+  };
+
+  const getButtonColor = () => {
+    switch (type) {
+      case "success":
+        return "bg-green-600 hover:bg-green-700";
+      case "error":
+        return "bg-red-600 hover:bg-red-700";
+      case "warning":
+        return "bg-yellow-600 hover:bg-yellow-700";
+      case "info":
+        return "bg-blue-600 hover:bg-blue-700";
+      default:
+        return "bg-blue-600 hover:bg-blue-700";
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 top-0 left-0 w-full h-screen bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-lg max-w-md w-full mx-auto">
+        <div className="p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            {getIcon()}
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h3>
+          </div>
+
+          {message && (
+            <p className="text-gray-600 dark:text-gray-300 mb-6">{message}</p>
+          )}
+
+          {children}
+
+          <div className="flex justify-end space-x-3">
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={onConfirm}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-md transition-colors cursor-pointer ${getButtonColor()}`}
+            >
+              {type === "warning" ? "Confirm" : "OK"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Subcourse Item Component
+const SubcourseItem = ({
+  subcourse,
+  isAssigned,
+  onToggle,
+  isParentAssigned,
+}) => {
+  return (
+    <div className="flex items-center space-x-3 p-2 ml-6 border-l-2 border-gray-200 dark:border-gray-600">
+      <input
+        type="checkbox"
+        checked={isAssigned}
+        onChange={onToggle}
+        disabled={!isParentAssigned}
+        className={`rounded border-gray-300 focus:ring-blue-500 ${
+          !isParentAssigned ? "opacity-50 cursor-not-allowed" : "text-blue-600"
+        }`}
+      />
+      <div className="flex-1 min-w-0">
+        <p
+          className={`text-sm font-medium truncate ${
+            !isParentAssigned
+              ? "text-gray-400"
+              : "text-gray-700 dark:text-gray-300"
+          }`}
+        >
+          {subcourse.description}
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+          {subcourse.code} • {subcourse.credits} credits
+        </p>
+        {subcourse.teacher && (
+          <p className="text-xs text-orange-500 truncate">
+            Currently assigned to: {subcourse.teacherName || "Another teacher"}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const TeacherManagement = () => {
+  const [teachers, setTeachers] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState(null);
+  const [expandedCourses, setExpandedCourses] = useState({});
+  const { user } = useAuth();
+
+  // Popup states
+  const [popup, setPopup] = useState({
+    show: false,
+    type: "info",
+    title: "",
+    message: "",
+    onConfirm: null,
+    onCancel: null,
+  });
+
+  // Add Teacher Form State
+  const [newTeacher, setNewTeacher] = useState({
+    name: "",
+    email: "",
+    password: "",
+    assignedCourses: [],
+    assignedSubcourses: [],
+  });
+
+  useEffect(() => {
+    fetchTeachers();
+    fetchCourses();
+  }, []);
+
+  const showPopup = (
+    type,
+    title,
+    message,
+    onConfirm = null,
+    onCancel = null
+  ) => {
+    setPopup({
+      show: true,
+      type,
+      title,
+      message,
+      onConfirm:
+        onConfirm || (() => setPopup((prev) => ({ ...prev, show: false }))),
+      onCancel:
+        onCancel || (() => setPopup((prev) => ({ ...prev, show: false }))),
+    });
+  };
+
+  // Get API base URL
+  const getApiUrl = (endpoint) => {
+    return `http://localhost:5000/api${endpoint}`;
+  };
+
+  // Get auth token
+  const getAuthToken = () => {
+    return localStorage.getItem("token") || sessionStorage.getItem("token");
+  };
+
+  const fetchTeachers = async () => {
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      const response = await axios.get(getApiUrl("/teachers"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      // API now returns { success, data, pagination } — extract the array
+      const teacherArray = response.data?.data || response.data || [];
+      setTeachers(Array.isArray(teacherArray) ? teacherArray : []);
+    } catch (error) {
+      // Fallback to sample data if API fails
+      setTeachers([
+        {
+          _id: "1",
+          name: "Dr. Sarah Wilson",
+          email: "sarah@university.edu",
+          role: "teacher",
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          _id: "2",
+          name: "Prof. James Brown",
+          email: "james@university.edu",
+          role: "teacher",
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      showPopup(
+        "error",
+        "Error",
+        "Failed to fetch teachers. Using sample data."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const token = getAuthToken();
+      const response = await axios.get(getApiUrl("/courses"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      // API now returns { success, data, pagination } — extract the array
+      const courseArray = response.data?.data || response.data || [];
+      // Group courses by main course name to create subcourse structure
+      const coursesByMainCourse = {};
+      (Array.isArray(courseArray) ? courseArray : []).forEach((course) => {
+        const mainCourseName = course.name;
+        if (!coursesByMainCourse[mainCourseName]) {
+          coursesByMainCourse[mainCourseName] = {
+            _id: `main_${mainCourseName}`,
+            name: mainCourseName,
+            baseCode: course.code.split("-")[0], // Get base code without suffix
+            subcourses: [],
+          };
+        }
+
+        // Add this course as a subcourse
+        coursesByMainCourse[mainCourseName].subcourses.push({
+          _id: course._id,
+          name: course.name,
+          code: course.code,
+          description: course.description,
+          credits: course.credits,
+          teacher: course.teacher?._id || course.teacher, // Handle both populated and non-populated
+          teacherName: course.teacher?.name || null, // Get teacher name if populated
+          schedule: course.schedule,
+          maxStudents: course.maxStudents,
+        });
+      });
+
+      // Convert to array for easier mapping
+      const groupedCourses = Object.values(coursesByMainCourse);
+      setCourses(groupedCourses);
+    } catch (error) {
+      // Fallback to sample data
+      const sampleCourses = [
+        {
+          _id: "main_computer_science",
+          name: "Computer Science",
+          baseCode: "COMP01",
+          subcourses: [
+            {
+              _id: "1",
+              name: "Computer Science",
+              code: "COMP01",
+              description: "Introduction to Programming",
+              credits: 4,
+              teacher: null,
+              teacherName: null,
+              schedule: {
+                days: ["Monday", "Wednesday", "Friday"],
+                startTime: "09:00",
+                endTime: "10:30",
+                room: "CS Building 101",
+              },
+              maxStudents: 40,
+            },
+          ],
+        },
+      ];
+      setCourses(sampleCourses);
+      showPopup(
+        "error",
+        "Error",
+        "Failed to fetch courses. Using sample data."
+      );
+    }
+  };
+
+  // Safe filtering
+  const filteredTeachers = (teachers || []).filter(
+    (teacher) =>
+      teacher.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Delete Teacher
+  const handleDeleteTeacher = async (teacher) => {
+    showPopup(
+      "warning",
+      "Delete Teacher",
+      `Are you sure you want to delete ${teacher.name}? This will also remove them from all assigned courses.`,
+      async () => {
+        try {
+          const token = getAuthToken();
+
+          // First, remove this teacher from all courses they teach
+          const teacherCourses = courses.flatMap((mainCourse) =>
+            mainCourse.subcourses.filter(
+              (subcourse) => subcourse.teacher === teacher._id
+            )
+          );
+
+          for (const course of teacherCourses) {
+            await axios.put(
+              getApiUrl(`/courses/${course._id}`),
+              {
+                teacher: null,
+              },
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }
+            );
+          }
+
+          // Then delete the teacher
+          await axios.delete(getApiUrl(`/teachers/${teacher._id}`), {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+
+          fetchTeachers();
+          fetchCourses(); // Refresh courses to update assignments
+          showPopup("success", "Success", "Teacher deleted successfully!");
+        } catch (error) {
+          console.error("Error deleting teacher:", error);
+          showPopup("error", "Error", "Failed to delete teacher");
+        }
+      }
+    );
+  };
+
+  // Edit Teacher
+  const handleEditTeacher = (teacher) => {
+    // Extract assigned subcourses from courses data
+    const assignedSubcourses = [];
+
+    courses.forEach((mainCourse) => {
+      mainCourse.subcourses.forEach((subcourse) => {
+        if (subcourse.teacher === teacher._id) {
+          assignedSubcourses.push(subcourse._id);
+        }
+      });
+    });
+
+    setEditingTeacher({
+      ...teacher,
+      assignedSubcourses: assignedSubcourses,
+    });
+  };
+
+  const handleUpdateTeacher = async (e) => {
+    e.preventDefault();
+
+    if (!editingTeacher.name || !editingTeacher.email) {
+      showPopup(
+        "warning",
+        "Validation Error",
+        "Please fill all required fields"
+      );
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      // First update the teacher's basic info
+      await axios.put(
+        getApiUrl(`/teachers/${editingTeacher._id}`),
+        {
+          name: editingTeacher.name,
+          email: editingTeacher.email,
+          isActive: editingTeacher.isActive,
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      // Update course assignments - set teacher for selected subcourses
+      for (const mainCourse of courses) {
+        for (const subcourse of mainCourse.subcourses) {
+          const shouldBeAssigned = editingTeacher.assignedSubcourses.includes(
+            subcourse._id
+          );
+          const isCurrentlyAssigned = subcourse.teacher === editingTeacher._id;
+
+          if (shouldBeAssigned && !isCurrentlyAssigned) {
+            // Assign this subcourse to teacher
+            await axios.put(
+              getApiUrl(`/courses/${subcourse._id}`),
+              {
+                teacher: editingTeacher._id,
+              },
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }
+            );
+          } else if (!shouldBeAssigned && isCurrentlyAssigned) {
+            // Remove teacher from this subcourse
+            await axios.put(
+              getApiUrl(`/courses/${subcourse._id}`),
+              {
+                teacher: null,
+              },
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }
+            );
+          }
+        }
+      }
+
+      setEditingTeacher(null);
+      fetchTeachers();
+      fetchCourses(); // Refresh courses to get updated teacher assignments
+      showPopup("success", "Success", "Teacher updated successfully!");
+    } catch (error) {
+      console.error("Error updating teacher:", error);
+      showPopup("error", "Error", "Failed to update teacher");
+    }
+  };
+
+  // Add Teacher
+  const handleAddTeacher = async (e) => {
+    e.preventDefault();
+
+    if (!newTeacher.name || !newTeacher.email || !newTeacher.password) {
+      showPopup(
+        "warning",
+        "Validation Error",
+        "Please fill all required fields"
+      );
+      return;
+    }
+
+    if (newTeacher.password.length < 6) {
+      showPopup(
+        "warning",
+        "Validation Error",
+        "Password must be at least 6 characters long"
+      );
+      return;
+    }
+
+    try {
+      const token = getAuthToken();
+      // Create teacher first
+      const teacherResponse = await axios.post(
+        getApiUrl("/teachers"),
+        {
+          name: newTeacher.name,
+          email: newTeacher.email,
+          password: newTeacher.password,
+          role: "teacher",
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      const newTeacherId = teacherResponse.data._id;
+
+      // Update subcourses to set the teacher reference
+      for (const mainCourse of courses) {
+        for (const subcourse of mainCourse.subcourses) {
+          if (newTeacher.assignedSubcourses.includes(subcourse._id)) {
+            await axios.put(
+              getApiUrl(`/courses/${subcourse._id}`),
+              {
+                teacher: newTeacherId,
+              },
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }
+            );
+          }
+        }
+      }
+
+      setShowAddForm(false);
+      setNewTeacher({
+        name: "",
+        email: "",
+        password: "",
+        assignedCourses: [],
+        assignedSubcourses: [],
+      });
+      fetchTeachers();
+      fetchCourses(); // Refresh courses
+      showPopup("success", "Success", "Teacher added successfully!");
+    } catch (error) {
+      console.error("Error adding teacher:", error);
+      showPopup("error", "Error", "Failed to add teacher");
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewTeacher((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditingTeacher((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Course assignment functions
+  const toggleCourseAssignment = (mainCourseId, isForNewTeacher = false) => {
+    const mainCourse = courses.find((c) => c._id === mainCourseId);
+    if (!mainCourse) return;
+
+    if (isForNewTeacher) {
+      const allSubcourseIds = mainCourse.subcourses.map((sc) => sc._id);
+      const currentlyAssigned = newTeacher.assignedSubcourses.filter((id) =>
+        allSubcourseIds.includes(id)
+      ).length;
+
+      if (currentlyAssigned === allSubcourseIds.length) {
+        // Remove all subcourses
+        setNewTeacher((prev) => ({
+          ...prev,
+          assignedSubcourses: prev.assignedSubcourses.filter(
+            (id) => !allSubcourseIds.includes(id)
+          ),
+        }));
+      } else {
+        // Add all subcourses
+        setNewTeacher((prev) => ({
+          ...prev,
+          assignedSubcourses: [
+            ...new Set([...prev.assignedSubcourses, ...allSubcourseIds]),
+          ],
+        }));
+      }
+    } else {
+      const allSubcourseIds = mainCourse.subcourses.map((sc) => sc._id);
+      const currentlyAssigned = editingTeacher.assignedSubcourses.filter((id) =>
+        allSubcourseIds.includes(id)
+      ).length;
+
+      if (currentlyAssigned === allSubcourseIds.length) {
+        // Remove all subcourses
+        setEditingTeacher((prev) => ({
+          ...prev,
+          assignedSubcourses: prev.assignedSubcourses.filter(
+            (id) => !allSubcourseIds.includes(id)
+          ),
+        }));
+      } else {
+        // Add all subcourses
+        setEditingTeacher((prev) => ({
+          ...prev,
+          assignedSubcourses: [
+            ...new Set([...prev.assignedSubcourses, ...allSubcourseIds]),
+          ],
+        }));
+      }
+    }
+  };
+
+  const toggleSubcourseAssignment = (
+    subcourseId,
+    mainCourseId,
+    isForNewTeacher = false
+  ) => {
+    if (isForNewTeacher) {
+      setNewTeacher((prev) => ({
+        ...prev,
+        assignedSubcourses: prev.assignedSubcourses.includes(subcourseId)
+          ? prev.assignedSubcourses.filter((id) => id !== subcourseId)
+          : [...prev.assignedSubcourses, subcourseId],
+      }));
+    } else {
+      setEditingTeacher((prev) => ({
+        ...prev,
+        assignedSubcourses: prev.assignedSubcourses.includes(subcourseId)
+          ? prev.assignedSubcourses.filter((id) => id !== subcourseId)
+          : [...prev.assignedSubcourses, subcourseId],
+      }));
+    }
+  };
+
+  const isCourseAssigned = (mainCourseId, teacherData) => {
+    const mainCourse = courses.find((c) => c._id === mainCourseId);
+    if (!mainCourse) return false;
+
+    const assignedSubcourses = mainCourse.subcourses.filter((sc) =>
+      teacherData?.assignedSubcourses?.includes(sc._id)
+    );
+
+    // Consider main course assigned if any subcourse is assigned
+    return assignedSubcourses.length > 0;
+  };
+
+  const isSubcourseAssigned = (subcourseId, teacherData) => {
+    return teacherData?.assignedSubcourses?.includes(subcourseId);
+  };
+
+  const isAllSubcoursesAssigned = (mainCourseId, teacherData) => {
+    const mainCourse = courses.find((c) => c._id === mainCourseId);
+    if (!mainCourse) return false;
+
+    return mainCourse.subcourses.every((sc) =>
+      teacherData?.assignedSubcourses?.includes(sc._id)
+    );
+  };
+
+  const toggleCourseExpansion = (courseId) => {
+    setExpandedCourses((prev) => ({
+      ...prev,
+      [courseId]: !prev[courseId],
+    }));
+  };
+
+  // Get teaching courses for display (from course.teacher reference)
+  const getTeachingCoursesForTeacher = (teacher) => {
+    const teachingCourses = [];
+
+    courses.forEach((mainCourse) => {
+      mainCourse.subcourses.forEach((subcourse) => {
+        if (subcourse.teacher === teacher._id) {
+          teachingCourses.push({
+            ...subcourse,
+            mainCourseName: mainCourse.name,
+          });
+        }
+      });
+    });
+
+    return teachingCourses;
+  };
+
+  // Get assigned subcourses count
+  const getAssignedSubcoursesCount = (teacher) => {
+    return getTeachingCoursesForTeacher(teacher).length;
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 font-poppins">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Teacher Management
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Loading teachers...
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 font-saira">
+      {/* Custom Popup */}
+      <CustomPopup
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+        onConfirm={popup.onConfirm}
+        onCancel={popup.onCancel}
+        show={popup.show}
+      />
+
+      {/* Add Teacher Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 top-0 left-0 w-full h-screen bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border dark:bg-gray-800 dark:border-gray-400 border-blue-500 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Add New Teacher
+                </h2>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddTeacher} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      value={newTeacher.name}
+                      onChange={handleInputChange}
+                      className="input w-full"
+                      placeholder="Enter teacher's full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      required
+                      value={newTeacher.email}
+                      onChange={handleInputChange}
+                      className="input w-full"
+                      placeholder="Enter teacher's email"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Password *
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    required
+                    value={newTeacher.password}
+                    onChange={handleInputChange}
+                    className="input w-full"
+                    placeholder="Enter temporary password"
+                  />
+                </div>
+
+                {/* Course Assignment Section */}
+                <div className="border-t pt-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">
+                    Assign Courses & Subcourses
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Select the courses and subcourses this teacher will teach
+                  </p>
+
+                  {courses.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                      No courses available. Please create courses first.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {courses.map((mainCourse) => {
+                        const isAssigned = isCourseAssigned(
+                          mainCourse._id,
+                          newTeacher
+                        );
+                        const allAssigned = isAllSubcoursesAssigned(
+                          mainCourse._id,
+                          newTeacher
+                        );
+                        const isExpanded = expandedCourses[mainCourse._id];
+                        const assignedSubcourses = mainCourse.subcourses.filter(
+                          (sub) => isSubcourseAssigned(sub._id, newTeacher)
+                        ).length;
+
+                        return (
+                          <div
+                            key={mainCourse._id}
+                            className="border border-gray-200 dark:border-gray-600 rounded-lg"
+                          >
+                            <div className="flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={allAssigned}
+                                ref={(input) => {
+                                  if (input) {
+                                    input.indeterminate =
+                                      isAssigned && !allAssigned;
+                                  }
+                                }}
+                                onChange={() =>
+                                  toggleCourseAssignment(mainCourse._id, true)
+                                }
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                  {mainCourse.name}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  Base Code: {mainCourse.baseCode}
+                                </p>
+                                <p className="text-xs text-blue-600 dark:text-blue-400">
+                                  {mainCourse.subcourses.length} subcourses
+                                  available
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {assignedSubcourses}/
+                                  {mainCourse.subcourses.length} assigned
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleCourseExpansion(mainCourse._id)
+                                  }
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown size={16} />
+                                  ) : (
+                                    <ChevronRight size={16} />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Subcourses */}
+                            {isExpanded && (
+                              <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 p-2">
+                                {mainCourse.subcourses.map((subcourse) => (
+                                  <SubcourseItem
+                                    key={subcourse._id}
+                                    subcourse={subcourse}
+                                    isAssigned={isSubcourseAssigned(
+                                      subcourse._id,
+                                      newTeacher
+                                    )}
+                                    isParentAssigned={true}
+                                    onToggle={() =>
+                                      toggleSubcourseAssignment(
+                                        subcourse._id,
+                                        mainCourse._id,
+                                        true
+                                      )
+                                    }
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="btn btn-secondary cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary cursor-pointer"
+                  >
+                    Add Teacher
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Teacher Modal */}
+      {editingTeacher && (
+        <div className="fixed inset-0 top-0 left-0 w-full h-screen bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 border dark:border-gray-400 border-blue-500 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Edit Teacher
+                </h2>
+                <button
+                  onClick={() => setEditingTeacher(null)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateTeacher} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      required
+                      value={editingTeacher.name}
+                      onChange={handleEditInputChange}
+                      className="input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      required
+                      value={editingTeacher.email}
+                      onChange={handleEditInputChange}
+                      className="input w-full"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Status
+                  </label>
+                  <select
+                    name="isActive"
+                    value={editingTeacher.isActive}
+                    onChange={handleEditInputChange}
+                    className="input w-full"
+                  >
+                    <option value={true}>Active</option>
+                    <option value={false}>Inactive</option>
+                  </select>
+                </div>
+
+                {/* Course Assignment Section */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                      Assigned Courses & Subcourses
+                    </h3>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {getTeachingCoursesForTeacher(editingTeacher).length}
+                      subcourses assigned
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Select the courses and subcourses this teacher will teach
+                  </p>
+
+                  {courses.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                      No courses available.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {courses.map((mainCourse) => {
+                        const isAssigned = isCourseAssigned(
+                          mainCourse._id,
+                          editingTeacher
+                        );
+                        const allAssigned = isAllSubcoursesAssigned(
+                          mainCourse._id,
+                          editingTeacher
+                        );
+                        const isExpanded = expandedCourses[mainCourse._id];
+                        const assignedSubcourses = mainCourse.subcourses.filter(
+                          (sub) => isSubcourseAssigned(sub._id, editingTeacher)
+                        ).length;
+
+                        return (
+                          <div
+                            key={mainCourse._id}
+                            className="border border-gray-200 dark:border-gray-600 rounded-lg"
+                          >
+                            <div className="flex items-center space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={allAssigned}
+                                ref={(input) => {
+                                  if (input) {
+                                    input.indeterminate =
+                                      isAssigned && !allAssigned;
+                                  }
+                                }}
+                                onChange={() =>
+                                  toggleCourseAssignment(mainCourse._id, false)
+                                }
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                  {mainCourse.name}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  Base Code: {mainCourse.baseCode}
+                                </p>
+                                <p className="text-xs text-blue-600 dark:text-blue-400">
+                                  {mainCourse.subcourses.length} subcourses
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {assignedSubcourses}/
+                                  {mainCourse.subcourses.length} assigned
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    toggleCourseExpansion(mainCourse._id)
+                                  }
+                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown size={16} />
+                                  ) : (
+                                    <ChevronRight size={16} />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Subcourses */}
+                            {isExpanded && (
+                              <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600 p-2">
+                                {mainCourse.subcourses.map((subcourse) => (
+                                  <SubcourseItem
+                                    key={subcourse._id}
+                                    subcourse={subcourse}
+                                    isAssigned={isSubcourseAssigned(
+                                      subcourse._id,
+                                      editingTeacher
+                                    )}
+                                    isParentAssigned={true}
+                                    onToggle={() =>
+                                      toggleSubcourseAssignment(
+                                        subcourse._id,
+                                        mainCourse._id,
+                                        false
+                                      )
+                                    }
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTeacher(null)}
+                    className="btn btn-secondary cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary cursor-pointer"
+                  >
+                    <Save size={20} className="mr-2 inline" />
+                    Update Teacher
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest of the component remains the same */}
+      {/* ... (Header, Search, Teacher Cards) ... */}
+
+      {/* Responsive Header Section */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Teacher Management
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Manage teacher records and course assignments
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full md:w-auto">
+          <div className="input relative flex-grow">
+            <Search
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              size={20}
+            />
+            <input
+              type="text"
+              placeholder="Search teachers..."
+              className="inpt pl-10 w-full placeholder:text-gray-400 outline-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {user?.role === "admin" && (
+            <button
+              className="btn btn-primary sm:w-auto cursor-pointer"
+              onClick={() => setShowAddForm(true)}
+            >
+              <Plus size={20} className="inline" />
+              <span className="ml-2">Add Teacher</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Teachers Grid */}
+      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {filteredTeachers.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">
+            <UserCog size={48} className="mx-auto mb-4 opacity-50" />
+            <p className="text-lg">No teachers found</p>
+            <p className="text-sm mt-2">
+              {teachers.length === 0
+                ? "No teachers in the system yet."
+                : "No teachers match your search criteria."}
+            </p>
+          </div>
+        ) : (
+          filteredTeachers.map((teacher) => {
+            const teachingCourses = getTeachingCoursesForTeacher(teacher);
+            const assignedSubcoursesCount = getAssignedSubcoursesCount(teacher);
+
+            return (
+              <div
+                key={teacher._id}
+                className="card group hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white transition-colors">
+                      {teacher.name}
+                    </h3>
+                    <p className="text-blue-600 dark:text-blue-400 font-medium">
+                      Teacher
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      teacher.isActive
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                        : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                    }`}
+                  >
+                    {teacher.isActive ? "Active" : "Inactive"}
+                  </span>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                    <Mail
+                      size={16}
+                      className="mr-2 flex-shrink-0 text-green-400"
+                    />
+                    <span className="truncate">{teacher.email}</span>
+                  </div>
+
+                  {/* Currently Teaching Courses */}
+                  <div className="text-sm">
+                    <div className="flex items-center text-gray-600 dark:text-gray-400 mb-2">
+                      <BookOpen
+                        size={16}
+                        className="mr-2 flex-shrink-0 text-blue-400"
+                      />
+                      <span>
+                        Teaching {teachingCourses.length} subcourse(s)
+                      </span>
+                    </div>
+
+                    {teachingCourses.length > 0 ? (
+                      <div className="space-y-1 max-h-20 overflow-y-auto">
+                        {teachingCourses.slice(0, 3).map((course) => (
+                          <div
+                            key={course._id}
+                            className="flex items-center text-xs"
+                          >
+                            <Check
+                              size={12}
+                              className="mr-1 text-green-500 flex-shrink-0"
+                            />
+                            <span className="text-gray-500 dark:text-gray-400 truncate">
+                              {course.code}: {course.description}
+                            </span>
+                          </div>
+                        ))}
+                        {teachingCourses.length > 3 && (
+                          <div className="text-xs text-gray-400 italic">
+                            +{teachingCourses.length - 3} more subcourses
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-500 italic">
+                        No courses assigned yet
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Member since:
+                    <span className="font-medium">
+                      {new Date(teacher.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                {user?.role === "admin" && (
+                  <div className="flex justify-start space-x-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <button
+                      className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium cursor-pointer"
+                      onClick={() => handleEditTeacher(teacher)}
+                    >
+                      <Edit size={16} />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      className="flex items-center space-x-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium cursor-pointer"
+                      onClick={() => handleDeleteTeacher(teacher)}
+                    >
+                      <Trash2 size={16} />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TeacherManagement;
