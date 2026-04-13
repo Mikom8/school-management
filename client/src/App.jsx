@@ -126,7 +126,7 @@ function AppContent() {
               <Route
                 path="/reports"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "teacher"]}>
+                  <ProtectedRoute allowedRoles={["admn", "teacher"]}>
                     <Reports />
                   </ProtectedRoute>
                 }
