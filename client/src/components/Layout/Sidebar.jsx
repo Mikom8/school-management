@@ -71,7 +71,7 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
       name: "Schedule",
       href: "/schedule",
       icon: Calendar,
-      roles: ["admin", "teacher", "student"],
+      roles: ["admin", "teacher", "student", "superadmin"],
     },
     {
       name: "Assignments",
@@ -95,7 +95,7 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
       name: "Settings",
       href: "/settings",
       icon: Settings,
-      roles: ["admin", "teacher", "student"],
+      roles: ["admin", "teacher", "student", "superadmin"],
     },
     {
       name: "Super Admin",
