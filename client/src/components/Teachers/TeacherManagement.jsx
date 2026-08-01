@@ -981,7 +981,7 @@ const TeacherManagement = () => {
             />
           </div>
 
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "superadmin") && (
             <button
               className="btn btn-primary sm:w-auto cursor-pointer"
               onClick={() => setShowAddForm(true)}
@@ -1032,7 +1032,7 @@ const TeacherManagement = () => {
                     >
                       {teacher.isActive ? "Active" : "Inactive"}
                     </span>
-                    {user?.role === "admin" && (
+                    {(user?.role === "admin" || user?.role === "superadmin") && (
                       <div className="relative">
                         <button
                           type="button"

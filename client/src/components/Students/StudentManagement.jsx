@@ -1151,7 +1151,7 @@ const StudentManagement = () => {
               : "Manage college student records and information"}
           </p>
         </div>
-        {user?.role === "admin" && (
+        {(user?.role === "admin" || user?.role === "superadmin") && (
           <button
             className="btn btn-primary flex items-center space-x-2 w-full sm:w-auto justify-center sm:justify-start cursor-pointer"
             onClick={() => setShowAddForm(true)}
@@ -1540,7 +1540,7 @@ const StudentManagement = () => {
                     <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base">
                       Name
                     </th>
-                    {user?.role === "admin" && (
+                    {(user?.role === "admin" || user?.role === "superadmin") && (
                       <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base hidden md:table-cell">
                         Email
                       </th>
@@ -1554,7 +1554,7 @@ const StudentManagement = () => {
                     <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base hidden lg:table-cell">
                       Department
                     </th>
-                    {user?.role === "admin" && (
+                    {(user?.role === "admin" || user?.role === "superadmin") && (
                       <th className="text-left py-3 px-2 sm:px-4 font-medium text-gray-900 dark:text-white text-sm sm:text-base whitespace-nowrap">
                         Actions
                       </th>
@@ -1577,7 +1577,7 @@ const StudentManagement = () => {
                             {student.user?.name}
                           </div>
                         </td>
-                        {user?.role === "admin" && (
+                        {(user?.role === "admin" || user?.role === "superadmin") && (
                           <td className="py-3 px-2 sm:px-4 text-gray-900 dark:text-white hidden md:table-cell">
                             {student.user?.email}
                           </td>
@@ -1591,7 +1591,7 @@ const StudentManagement = () => {
                         <td className="py-3 px-2 sm:px-4 text-gray-900 dark:text-white hidden lg:table-cell">
                           {student.department?.name || student.department || "-"}
                         </td>
-                        {user?.role === "admin" && (
+                        {(user?.role === "admin" || user?.role === "superadmin") && (
                           <td className="py-3 px-2 sm:px-4">
                             <div className="relative">
                               <button
