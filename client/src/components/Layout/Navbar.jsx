@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LogOut, User, Menu, X, Search, Bell, Check } from "lucide-react";
+import { LogOut, Menu, X, Search, Bell, Check } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";

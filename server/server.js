@@ -76,7 +76,7 @@ connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`API available at http://localhost:${PORT}/api`);
-    
+
     // --- Render Free Tier Keep-Awake ---
     // Render instances sleep after 15 mins of inactivity.
     // This script pings the server every 14 minutes.

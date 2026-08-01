@@ -4,7 +4,6 @@ import {
   Edit,
   Save,
   X,
-  BookOpen,
   Users,
   Loader,
   Search,

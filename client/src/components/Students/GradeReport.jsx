@@ -6,7 +6,6 @@ import {
   Award,
   TrendingUp,
   Calendar,
-  Loader,
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../../contexts/AuthContext";

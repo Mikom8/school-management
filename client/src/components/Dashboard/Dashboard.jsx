@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../../contexts/AuthContext";
-import { motion } from "framer-motion";
 import SkeletonLoading from "../Common/SkeletonLoading";
 import { formatTimeTo12Hour } from "../../utils/timeFormat";
 import {

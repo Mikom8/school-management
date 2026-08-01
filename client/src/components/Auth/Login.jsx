@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { GraduationCap, Eye, EyeOff, Loader } from "lucide-react";
+import { Eye, EyeOff, Loader } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Login = () => {
