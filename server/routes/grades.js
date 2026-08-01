@@ -164,7 +164,7 @@ router.post(
   "/",
   [
     auth,
-    authorize("teacher", "admin"),
+    authorize("teacher", "admin", "superadmin"),
     body("studentId").notEmpty().withMessage("Student ID is required"),
     body("courseId").notEmpty().withMessage("Course ID is required"),
     body("percentage")
@@ -319,7 +319,7 @@ router.post(
 // @desc    Get all grades (for admin and teacher)
 // @route   GET /api/grades
 // @access  Private (Admin, Teacher)
-router.get("/", auth, authorize("admin", "teacher"), async (req, res) => {
+router.get("/", auth, authorize("admin", "teacher", "superadmin"), async (req, res) => {
   try {
     const { page = 1, limit = 20, studentId, courseId, semester } = req.query;
 

@@ -104,7 +104,7 @@ const Reports = () => {
 
         case "grades":
           // ADMIN: Use the admin grades endpoint
-          if (user?.role === "admin") {
+          if (user?.role === "admin" || user?.role === "superadmin") {
             endpoint = "grades";
             if (selectedDepartment) params.department = selectedDepartment;
             if (selectedYear) params.grade = selectedYear;
@@ -331,7 +331,7 @@ const Reports = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Department Selection - For admin and teacher */}
-              {(user?.role === "admin" || user?.role === "teacher") && (
+              {(user?.role === "admin" || user?.role === "teacher" || user?.role === "superadmin") && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Department (Optional)
@@ -374,7 +374,7 @@ const Reports = () => {
               )}
 
               {/* Year Selection - For admin only */}
-              {user?.role === "admin" && (
+              {(user?.role === "admin" || user?.role === "superadmin") && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Year (Optional)

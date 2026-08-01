@@ -941,7 +941,7 @@ const CourseManagement = () => {
       }
       acc[deptId].courses.push(course);
       return acc;
-    }, user?.role === "admin" ? departments.reduce((acc, dept) => {
+    }, user?.role === "admin" || user?.role === "superadmin" ? departments.reduce((acc, dept) => {
       const matchesDeptFilter = selectedDeptFilter === "all" || selectedDeptFilter === dept._id;
       const matchesSearch = searchTerm.trim() === "" || dept.name.toLowerCase().includes(searchTerm.toLowerCase());
       if (matchesDeptFilter && matchesSearch) {
@@ -1107,7 +1107,7 @@ const CourseManagement = () => {
             />
           </div>
 
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "superadmin") && (
             <div className="relative">
               <select
                 value={selectedDeptFilter}
@@ -1124,7 +1124,7 @@ const CourseManagement = () => {
             </div>
           )}
 
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "superadmin") && (
             <>
               <button
                 onClick={() => {
@@ -1236,7 +1236,7 @@ const CourseManagement = () => {
                                   {course.credits} credits
                                 </span>
                                 {user?.role !== "student" &&
-                                  (user?.role === "admin" ||
+                                  (user?.role === "admin" || user?.role === "superadmin" ||
                                     (user?.role === "teacher" && assignedTeacher?._id === user._id)) && (
                                     <div className="relative">
                                       <button
@@ -1286,7 +1286,7 @@ const CourseManagement = () => {
                                     </div>
                                   )}
                               </div>
-                              {user?.role === "admin" && (
+                              {(user?.role === "admin" || user?.role === "superadmin") && (
                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 flex items-center gap-1 whitespace-nowrap">
                                   <Users size={10} />
                                   {studentCount} enrolled
