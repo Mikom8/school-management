@@ -58,6 +58,8 @@ app.use("/api/grades", require("./routes/grades"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/assignments", require("./routes/assignments"));
+app.use("/api/superadmin", require("./routes/superadmin"));
+
 
 // Default route provided
 app.get("/", (req, res) => {

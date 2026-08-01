@@ -150,7 +150,7 @@ router.get("/departments", auth, async (req, res) => {
 // @desc    Create a department
 // @route   POST /api/courses/departments
 // @access  Private (Admin)
-router.post("/departments", auth, authorize("admin"), async (req, res) => {
+router.post("/departments", auth, authorize("admin", "superadmin"), async (req, res) => {
   try {
     const { name, code, description } = req.body;
     if (!name || !name.trim()) {
@@ -181,7 +181,7 @@ router.post("/departments", auth, authorize("admin"), async (req, res) => {
 // @desc    Delete a department
 // @route   DELETE /api/courses/departments/:id
 // @access  Private (Admin)
-router.delete("/departments/:id", auth, authorize("admin"), async (req, res) => {
+router.delete("/departments/:id", auth, authorize("admin", "superadmin"), async (req, res) => {
   try {
     const dept = await Department.findByIdAndDelete(req.params.id);
     if (!dept) return res.status(404).json({ success: false, message: "Department not found" });
@@ -194,7 +194,7 @@ router.delete("/departments/:id", auth, authorize("admin"), async (req, res) => 
 // @desc    Update a department
 // @route   PUT /api/courses/departments/:id
 // @access  Private (Admin)
-router.put("/departments/:id", auth, authorize("admin"), async (req, res) => {
+router.put("/departments/:id", auth, authorize("admin", "superadmin"), async (req, res) => {
   try {
     const { name, code, description } = req.body;
     if (!name || !name.trim()) {
@@ -326,7 +326,7 @@ router.get("/departments", auth, async (req, res) => {
 });
 
 // Create department (admin only)
-router.post("/departments", auth, authorize("admin"), async (req, res) => {
+router.post("/departments", auth, authorize("admin", "superadmin"), async (req, res) => {
   try {
     const { name, code, description } = req.body;
     if (!name) return res.status(400).json({ success: false, message: "Name is required" });
@@ -404,7 +404,7 @@ router.put("/:id", auth, async (req, res) => {
     const oldTeacher = existingCourse.teacher;
     
     // Only admins can change the teacher assignment
-    if (teacher !== undefined && req.user.role === "admin") {
+    if (teacher !== undefined && (req.user.role === "admin" || req.user.role === "superadmin")) {
       updateFields.teacher = teacher;
     }
 

@@ -7,7 +7,7 @@ const router = express.Router();
 // Check whether an email is already registered
 router.get("/check-email", auth, async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
+    if (req.user.role !== "admin" && req.user.role !== "superadmin") {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -41,10 +41,10 @@ router.get("/teachers", auth, async (req, res) => {
   }
 });
 
-// Get all users (admin only)
+// Get all users (admin & superadmin only)
 router.get("/", auth, async (req, res) => {
   try {
-    if (req.user.role !== "admin") {
+    if (req.user.role !== "admin" && req.user.role !== "superadmin") {
       return res.status(403).json({ message: "Access denied" });
     }
 

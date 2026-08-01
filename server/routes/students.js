@@ -16,7 +16,7 @@ router.post(
   "/register",
   [
     auth,
-    authorize("admin"),
+    authorize("admin", "superadmin"),
     body("name").trim().notEmpty().withMessage("Name is required"),
     body("email")
       .trim()
@@ -166,7 +166,7 @@ router.post(
 // @desc    Get available main courses for student registration
 // @route   GET /api/students/available-courses
 // @access  Private (Admin)
-router.get("/available-courses", auth, authorize("admin"), async (req, res) => {
+router.get("/available-courses", auth, authorize("admin", "superadmin"), async (req, res) => {
   try {
     // Get distinct course names first
     const distinctCourseNames = await Course.distinct("name", { isActive: true });
@@ -214,7 +214,7 @@ router.get("/available-courses", auth, authorize("admin"), async (req, res) => {
 // @desc    Get all students with pagination
 // @route   GET /api/students
 // @access  Private (Admin, Teacher)
-router.get("/", auth, authorize("admin", "teacher"), async (req, res) => {
+router.get("/", auth, authorize("admin", "teacher", "superadmin"), async (req, res) => {
   try {
     const isPaginated = req.query.page && req.query.limit;
     const page = parseInt(req.query.page) || 1;
@@ -353,7 +353,7 @@ router.post(
   "/",
   [
     auth,
-    authorize("admin"),
+    authorize("admin", "superadmin"),
     body("grade")
       .isIn([
         "Remedial",
@@ -402,7 +402,7 @@ router.post(
 // @desc    Update student
 // @route   PUT /api/students/:id
 // @access  Private (Admin)
-router.put("/:id", auth, authorize("admin"), async (req, res) => {
+router.put("/:id", auth, authorize("admin", "superadmin"), async (req, res) => {
   try {
     const student = await Student.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -432,7 +432,7 @@ router.put("/:id", auth, authorize("admin"), async (req, res) => {
 // @desc    Delete student
 // @route   DELETE /api/students/:id
 // @access  Private (Admin)
-router.delete("/:id", auth, authorize("admin"), async (req, res) => {
+router.delete("/:id", auth, authorize("admin", "superadmin"), async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
 

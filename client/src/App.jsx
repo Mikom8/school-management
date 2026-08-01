@@ -19,6 +19,7 @@ const Reports = lazy(() => import("./components/Reports/Reports"));
 const Schedule = lazy(() => import("./components/Schedule/Schedule"));
 const AssignmentManagement = lazy(() => import("./components/Assignments/AssignmentManagement"));
 const Settings = lazy(() => import("./components/Settings/Settings"));
+const SuperAdminDashboard = lazy(() => import("./components/SuperAdmin/SuperAdminDashboard"));
 
 // Simple full-screen loading fallback
 const PageLoader = () => (
@@ -108,7 +109,7 @@ function AppContent() {
               <Route
                 path="/students"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "teacher"]}>
+                  <ProtectedRoute allowedRoles={["admin", "teacher", "superadmin"]}>
                     <StudentManagement />
                   </ProtectedRoute>
                 }
@@ -116,7 +117,7 @@ function AppContent() {
               <Route
                 path="/teachers"
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute allowedRoles={["admin", "superadmin"]}>
                     <TeacherManagement />
                   </ProtectedRoute>
                 }
@@ -124,7 +125,7 @@ function AppContent() {
               <Route
                 path="/courses"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "teacher", "student"]}>
+                  <ProtectedRoute allowedRoles={["admin", "teacher", "student", "superadmin"]}>
                     <CourseManagement />
                   </ProtectedRoute>
                 }
@@ -140,7 +141,7 @@ function AppContent() {
               <Route
                 path="/reports"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "teacher"]}>
+                  <ProtectedRoute allowedRoles={["admin", "teacher", "superadmin"]}>
                     <Reports />
                   </ProtectedRoute>
                 }
@@ -174,6 +175,14 @@ function AppContent() {
                 element={
                   <ProtectedRoute>
                     <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/superadmin"
+                element={
+                  <ProtectedRoute allowedRoles={["superadmin"]}>
+                    <SuperAdminDashboard />
                   </ProtectedRoute>
                 }
               />

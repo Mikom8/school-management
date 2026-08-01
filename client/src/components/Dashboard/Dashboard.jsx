@@ -122,7 +122,7 @@ const Dashboard = () => {
     fetchDashboardData();
 
     // Load role-specific data
-    if (user?.role === "admin") {
+    if (user?.role === "admin" || user?.role === "superadmin") {
       fetchStudents();
       fetchTeachers();
       fetchEnrollmentTrend();
@@ -1309,14 +1309,16 @@ const Dashboard = () => {
 
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          {user?.role === "admin"
-            ? "Admin Dashboard"
-            : user?.role === "teacher"
-              ? "Faculty Dashboard"
-              : `${user?.name || "Student"}`}
+          {user?.role === "superadmin"
+            ? "Super Admin Dashboard"
+            : user?.role === "admin"
+              ? "Admin Dashboard"
+              : user?.role === "teacher"
+                ? "Faculty Dashboard"
+                : `${user?.name || "Student"}`}
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          {user?.role === "admin"
+          {user?.role === "superadmin" || user?.role === "admin"
             ? `Welcome back, ${user?.name}! Here's an overview of the college.`
             : user?.role === "teacher"
               ? `Welcome, Instructor ${user?.name}! Here's your teaching overview.`
@@ -1325,7 +1327,7 @@ const Dashboard = () => {
       </div>
 
       {/* Render role-specific dashboard */}
-      {user?.role === "admin" && renderAdminDashboard()}
+      {(user?.role === "admin" || user?.role === "superadmin") && renderAdminDashboard()}
       {user?.role === "teacher" && renderTeacherDashboard()}
       {user?.role === "student" && renderStudentDashboard()}
     </div>

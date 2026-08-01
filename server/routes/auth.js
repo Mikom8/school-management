@@ -26,7 +26,7 @@ router.post(
       .withMessage("Password must be at least 6 characters"),
     body("role")
       .optional()
-      .isIn(["admin", "teacher", "student"])
+      .isIn(["superadmin", "admin", "teacher", "student"])
       .withMessage("Invalid role"),
   ],
   async (req, res) => {

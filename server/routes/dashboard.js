@@ -16,16 +16,18 @@ router.get("/", auth, cacheMiddleware(300), async (req, res) => {
     const userRole = req.user.role;
     let dashboardData = {};
 
-    if (userRole === "admin") {
-      // Admin dashboard stats
+    if (userRole === "admin" || userRole === "superadmin") {
+      // Admin / Superadmin dashboard stats
       const totalStudents = await Student.countDocuments();
       const totalTeachers = await User.countDocuments({ role: "teacher" });
       const totalDepartments = await Department.countDocuments();
+      const totalAdmins = await User.countDocuments({ role: "admin" });
 
       dashboardData = {
         students: totalStudents,
         teachers: totalTeachers,
         departments: totalDepartments,
+        admins: totalAdmins,
         attendance: 94, // Mock data for demo
       };
     } else if (userRole === "teacher") {

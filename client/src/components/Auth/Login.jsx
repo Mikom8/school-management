@@ -35,6 +35,7 @@ const Login = () => {
   };
 
   const demoAccounts = [
+    { role: "Superadmin", email: "superadmin@gmial.com", password: "840077" },
     { role: "Admin", email: "admin@school.com", password: "password" },
     { role: "Teacher", email: "teacher@school.com", password: "password" },
     { role: "Student", email: "student@school.com", password: "password" },

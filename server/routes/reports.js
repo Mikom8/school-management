@@ -12,7 +12,7 @@ const router = express.Router();
 router.get(
   "/attendance",
   auth,
-  authorize("admin", "teacher"),
+  authorize("admin", "teacher", "superadmin"),
   async (req, res) => {
     try {
       const { startDate, endDate, courseId } = req.query;
@@ -57,7 +57,7 @@ router.get(
 // @desc    Get grade report
 // @route   GET /api/reports/grades
 // @access  Private (Admin, Teacher)
-router.get("/grades", auth, authorize("admin", "teacher"), async (req, res) => {
+router.get("/grades", auth, authorize("admin", "teacher", "superadmin"), async (req, res) => {
   try {
     const { semester, courseId } = req.query;
 
@@ -106,7 +106,7 @@ router.get("/grades", auth, authorize("admin", "teacher"), async (req, res) => {
 router.get(
   "/student-performance",
   auth,
-  authorize("admin", "teacher"),
+  authorize("admin", "teacher", "superadmin"),
   async (req, res) => {
     try {
       const { studentId } = req.query;

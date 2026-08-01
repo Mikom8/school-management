@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   LogOut,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import axios from "axios";
@@ -40,19 +41,19 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
       name: "Dashboard",
       href: "/",
       icon: LayoutDashboard,
-      roles: ["admin", "teacher", "student"],
+      roles: ["admin", "teacher", "student", "superadmin"],
     },
     {
       name: "Students",
       href: "/students",
       icon: Users,
-      roles: ["admin", "teacher"],
+      roles: ["admin", "teacher", "superadmin"],
     },
     {
       name: "Teachers",
       href: "/teachers",
       icon: UserCog,
-      roles: ["admin"],
+      roles: ["admin", "superadmin"],
     },
     {
       name: "Grade Management",
@@ -64,7 +65,7 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
       name: "Courses",
       href: "/courses",
       icon: School,
-      roles: ["admin", "teacher", "student"],
+      roles: ["admin", "teacher", "student", "superadmin"],
     },
     {
       name: "Schedule",
@@ -82,7 +83,7 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
       name: "Reports",
       href: "/reports",
       icon: BarChart3,
-      roles: ["admin", "teacher"],
+      roles: ["admin", "teacher", "superadmin"],
     },
     {
       name: "Grade Report",
@@ -95,6 +96,12 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
       href: "/settings",
       icon: Settings,
       roles: ["admin", "teacher", "student"],
+    },
+    {
+      name: "Super Admin",
+      href: "/superadmin",
+      icon: Shield,
+      roles: ["superadmin"],
     },
   ];
 
@@ -116,7 +123,7 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
       }
     };
 
-    if (user?.role === "admin") {
+    if (user?.role === "admin" || user?.role === "superadmin") {
       fetchStats();
     }
   }, [user?.role]);
@@ -253,7 +260,7 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
         </nav>
 
         {/* Quick Stats Section - Using your exact dropdown style */}
-        {!isCollapsed && user?.role === "admin" && (
+        {!isCollapsed && (user?.role === "admin" || user?.role === "superadmin") && (
           <div className="p-4 mt-auto border-t border-gray-200/50 dark:border-gray-700/50">
             <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl shadow-inner mb-4">
               {/* Dropdown Header */}
@@ -282,6 +289,7 @@ const Sidebar = ({ isMobileOpen, onMobileClose, onSidebarToggle }) => {
                     { label: "Students", key: "students" },
                     { label: "Faculty", key: "teachers" },
                     { label: "Department", key: "departments" },
+                    ...(user?.role === "superadmin" ? [{ label: "Admins", key: "admins" }] : []),
                   ].map(({ label, key }) => (
                     <div
                       key={key}

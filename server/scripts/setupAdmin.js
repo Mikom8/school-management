@@ -10,41 +10,77 @@ const createInitialUsers = async () => {
     );
     console.log("Connected to MongoDB");
 
-    // Clear existing users (optional)
-    await User.deleteMany({});
-    console.log("Cleared existing users");
+    // ── Upsert superadmin (don't wipe everything) ──────────────────────────
+    const superEmail = "superadmin@gmial.com";
+    let superadmin = await User.findOne({ email: superEmail });
 
-    // Create admin user
-    const adminUser = await User.create({
-      name: "System Administrator",
-      email: "admin@school.com",
-      password: "password",
-      role: "admin",
-    });
-    console.log("Admin user created:", adminUser.email);
+    if (superadmin) {
+      // Update password & role in case they changed
+      superadmin.password = "840077";
+      superadmin.role = "superadmin";
+      superadmin.isActive = true;
+      await superadmin.save();
+      console.log("✅ Superadmin updated:", superEmail);
+    } else {
+      superadmin = await User.create({
+        name: "Super Administrator",
+        email: superEmail,
+        password: "840077",
+        role: "superadmin",
+      });
+      console.log("✅ Superadmin created:", superEmail);
+    }
 
-    // Create teacher user
-    const teacherUser = await User.create({
-      name: "John Teacher",
-      email: "teacher@school.com",
-      password: "password",
-      role: "teacher",
-    });
-    console.log("Teacher user created:", teacherUser.email);
+    // ── Create / update demo admin ──────────────────────────────────────────
+    const adminEmail = "admin@school.com";
+    let adminUser = await User.findOne({ email: adminEmail });
+    if (!adminUser) {
+      adminUser = await User.create({
+        name: "System Administrator",
+        email: adminEmail,
+        password: "password",
+        role: "admin",
+      });
+      console.log("✅ Admin user created:", adminEmail);
+    } else {
+      console.log("ℹ️  Admin already exists:", adminEmail);
+    }
 
-    // Create student user
-    const studentUser = await User.create({
-      name: "Sarah Student",
-      email: "student@school.com",
-      password: "password",
-      role: "student",
-    });
-    console.log("Student user created:", studentUser.email);
+    // ── Create / update demo teacher ───────────────────────────────────────
+    const teacherEmail = "teacher@school.com";
+    let teacherUser = await User.findOne({ email: teacherEmail });
+    if (!teacherUser) {
+      teacherUser = await User.create({
+        name: "John Teacher",
+        email: teacherEmail,
+        password: "password",
+        role: "teacher",
+      });
+      console.log("✅ Teacher user created:", teacherEmail);
+    } else {
+      console.log("ℹ️  Teacher already exists:", teacherEmail);
+    }
+
+    // ── Create / update demo student ───────────────────────────────────────
+    const studentEmail = "student@school.com";
+    let studentUser = await User.findOne({ email: studentEmail });
+    if (!studentUser) {
+      studentUser = await User.create({
+        name: "Sarah Student",
+        email: studentEmail,
+        password: "password",
+        role: "student",
+      });
+      console.log("✅ Student user created:", studentEmail);
+    } else {
+      console.log("ℹ️  Student already exists:", studentEmail);
+    }
 
     console.log("\n=== Login Credentials ===");
-    console.log("Admin: admin@school.com / password");
-    console.log("Teacher: teacher@school.com / password");
-    console.log("Student: student@school.com / password");
+    console.log("Superadmin: superadmin@gmial.com / 840077");
+    console.log("Admin:      admin@school.com     / password");
+    console.log("Teacher:    teacher@school.com   / password");
+    console.log("Student:    student@school.com   / password");
     console.log("========================\n");
 
     process.exit(0);
